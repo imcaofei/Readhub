@@ -13,6 +13,12 @@
     ]]></description>
 
     <change-notes><![CDATA[
+      <p>1.5.0</p>
+      <ul>
+          <li>适配新版 Readhub 热门话题接口 ( <i>Adapt to the new Readhub topic API</i> )</li>
+          <li>修复刷新失败导致界面不更新的问题 ( <i>Fix refresh failure blocking UI update</i> )</li>
+          <li>修复工具栏按钮鼠标悬停显示手型光标 ( <i>Show hand cursor on toolbar buttons</i> )</li>
+      </ul>
       <p>1.4.0</p>
       <ul>
           <li>升级 Gradle wrapper 至 7.4.2 与 gradle-intellij-plugin 至 1.13.1，支持 JDK 17 构建 ( <i>Upgrade Gradle wrapper &amp; gradle-intellij-plugin for JDK 17 build</i> )</li>

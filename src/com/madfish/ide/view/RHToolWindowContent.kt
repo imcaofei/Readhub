@@ -25,6 +25,9 @@ import com.madfish.ide.util.RHUtil
 import net.miginfocom.swing.MigLayout
 import java.awt.BorderLayout
 import java.awt.Color
+import java.awt.Component
+import java.awt.Container
+import java.awt.Cursor
 import java.awt.Insets
 import java.awt.event.KeyEvent
 import java.awt.event.MouseEvent
@@ -203,6 +206,8 @@ open class RHToolWindowContent(var project: Project, var category: RHCategory) {
 
         val toolbar = ActionManager.getInstance().createActionToolbar(ActionPlaces.TOOLBAR, actionGroup, true)
         toolbar.setTargetComponent(myTable)
+        setHandCursor(toolbar.component)
+        loadMoreBtn.cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
 
         searchField.addDocumentListener(object : DocumentAdapter() {
             override fun textChanged(e: DocumentEvent) {
@@ -241,6 +246,16 @@ open class RHToolWindowContent(var project: Project, var category: RHCategory) {
             myPaginationLabel.border = JBUI.Borders.emptyRight(30)
         } else {
             myPaginationLabel.text = ""
+        }
+    }
+
+    /**
+     * 递归为工具栏及按钮组件设置手型光标，使鼠标悬停时显示"可点击"手势。
+     */
+    private fun setHandCursor(component: Component) {
+        component.cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+        if (component is Container) {
+            component.components.forEach { setHandCursor(it) }
         }
     }
 
@@ -290,6 +305,7 @@ open class RHToolWindowContent(var project: Project, var category: RHCategory) {
 
         val toolbar = ActionManager.getInstance().createActionToolbar(ActionPlaces.TOOLBAR, actionGroup, true)
         toolbar.setTargetComponent(mySummaryPanel)
+        setHandCursor(toolbar.component)
         return toolbar.component
     }
 
