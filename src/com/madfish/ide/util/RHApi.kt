@@ -7,6 +7,10 @@ import com.madfish.ide.internal.d
 import com.madfish.ide.model.RHApiResponse
 import com.madfish.ide.model.RHBaseItem
 import com.madfish.ide.model.RHCategory
+import com.madfish.ide.model.RHDailyItem
+import com.madfish.ide.model.RHDailyListResponse
+import com.madfish.ide.model.RHHotItem
+import com.madfish.ide.model.RHHotListResponse
 import com.madfish.ide.model.RHInstantView
 import com.madfish.ide.model.RHTopic
 import com.madfish.ide.model.RHTopicListResponse
@@ -76,9 +80,9 @@ class RHApi {
         }
 
         fun fetchLatestItems(category: RHCategory, pageSize: Int = 20): ApiResult<Boolean> {
-            // 热门话题为"当前话题集合"，且新旧接口 id 体系不同（新版用 uid 作游标）。
-            // 刷新时替换旧缓存，避免旧版遗留的 id 污染 max_topic_id 翻页游标，导致"加载更多"无效。
-            if (category == RHCategory.TOPIC) {
+            // 热门话题/每日早报/排行榜为"当前内容集合"，且部分接口 id 体系不同。
+            // 刷新时替换旧缓存，避免旧版遗留的 id 污染游标/累积过时内容。
+            if (category == RHCategory.TOPIC || category == RHCategory.DAILY || category == RHCategory.HOT) {
                 service<RHData>().clearCategory(category)
             }
             val cursor = when (category) {
@@ -99,10 +103,18 @@ class RHApi {
         }
 
         fun getReadhubResponse(category: RHCategory, cursor: String = "@null", pageSize: Int = 20): ApiResult<RHApiResponse<out RHBaseItem>> {
-            // 新版 Readhub 热门话题接口：GET /topic/list?page=1&size=N&max_topic_id=<cursor>
-            if (category == RHCategory.TOPIC) {
-                return getTopicList(cursor, pageSize)
+            return when (category) {
+                // 新版 Readhub 热门话题接口：GET /topic/list?page=1&size=N&max_topic_id=<cursor>
+                RHCategory.TOPIC -> getTopicList(cursor, pageSize)
+                // 每日早报：GET /daily
+                RHCategory.DAILY -> getDailyList()
+                // 排行榜（24 小时热榜）：GET /topic/hot（无 size，默认返回全部）
+                RHCategory.HOT -> getHotList()
+                else -> getLegacyResponse(category, cursor, pageSize)
             }
+        }
+
+        private fun getLegacyResponse(category: RHCategory, cursor: String = "@null", pageSize: Int = 20): ApiResult<RHApiResponse<out RHBaseItem>> {
             val url = "${Constants.Readhub.apiHost}/${category.apiPath}?lastCursor=$cursor&pageSize=$pageSize"
             return try {
                 val request = Request.Builder().url(url).header("Content-Type", "application/json; charset=UTF-8").build()
@@ -114,6 +126,59 @@ class RHApi {
                     val result = gson.fromJson<RHApiResponse<out RHBaseItem>?>(res, category.getApiResType())
                     result?.data?.forEach { it.category = category }
                     ApiResult(true, result = result)
+                }
+            } catch (e: Exception) {
+                logger.d(ErrMessage.API_NETWORK_ERROR.text, e)
+                ApiResult(false, ErrMessage.API_NETWORK_ERROR, e.message.orEmpty())
+            }
+        }
+
+        /**
+         * 每日早报接口：/daily，返回 { data: { items: [ {title, uid, summary, type} ] } }。
+         * uid → id 归一化到 RHBaseItem。
+         */
+        private fun getDailyList(): ApiResult<RHApiResponse<out RHBaseItem>> {
+            val url = "${Constants.Readhub.apiHost}/daily"
+            return try {
+                val request = Request.Builder().url(url).header("Content-Type", "application/json; charset=UTF-8").build()
+                val response = httpClient.newCall(request).execute()
+                if (!response.isSuccessful) {
+                    ApiResult(false, errcode = ErrMessage.API_NETWORK_ERROR)
+                } else {
+                    val res = response.body?.string().orEmpty()
+                    val listResp = gson.fromJson(res, RHDailyListResponse::class.java)
+                    val items = listResp.data.items
+                    items.forEach { it ->
+                        it.category = RHCategory.DAILY
+                        if (it.id.isBlank()) it.id = it.uid
+                    }
+                    ApiResult(true, result = RHApiResponse(
+                            pageSize = items.size, totalItems = items.size, totalPages = 1, data = items))
+                }
+            } catch (e: Exception) {
+                logger.d(ErrMessage.API_NETWORK_ERROR.text, e)
+                ApiResult(false, ErrMessage.API_NETWORK_ERROR, e.message.orEmpty())
+            }
+        }
+
+        /**
+         * 排行榜接口：/topic/hot?size=30，返回 { data: { items: [ {title, id, publishDate} ] } }。
+         * 榜单共 30 条，必须带 size=30 才返回全部（不带 size 仅返回 15 条）。
+         */
+        private fun getHotList(): ApiResult<RHApiResponse<out RHBaseItem>> {
+            val url = "${Constants.Readhub.apiHost}/topic/hot?size=30"
+            return try {
+                val request = Request.Builder().url(url).header("Content-Type", "application/json; charset=UTF-8").build()
+                val response = httpClient.newCall(request).execute()
+                if (!response.isSuccessful) {
+                    ApiResult(false, errcode = ErrMessage.API_NETWORK_ERROR)
+                } else {
+                    val res = response.body?.string().orEmpty()
+                    val listResp = gson.fromJson(res, RHHotListResponse::class.java)
+                    val items = listResp.data.items
+                    items.forEach { it.category = RHCategory.HOT }
+                    ApiResult(true, result = RHApiResponse(
+                            pageSize = items.size, totalItems = items.size, totalPages = 1, data = items))
                 }
             } catch (e: Exception) {
                 logger.d(ErrMessage.API_NETWORK_ERROR.text, e)

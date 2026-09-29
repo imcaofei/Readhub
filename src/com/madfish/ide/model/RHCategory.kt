@@ -14,6 +14,8 @@ enum class RHCategory(
 ) {
     TOPIC("RHCategory.topic", "", "topic"),
     NEWS("RHCategory.news", "news", "news"),
+    DAILY("RHCategory.daily", "daily", "daily"),
+    HOT("RHCategory.hot", "hot", "topic/hot"),
     TECH_NEWS("RHCategory.technews", "tech", "technews"),
     BLOCKCHAIN("RHCategory.blockchain", "blockchain", "blockchain"),
     JOB("RHCategory.jobs", "jobs", "jobs");
@@ -22,6 +24,8 @@ enum class RHCategory(
         return when {
             this == TOPIC -> object : TypeToken<RHApiResponse<RHTopic>>() {}.type
             this == JOB -> object : TypeToken<RHApiResponse<RHJob>>() {}.type
+            this == DAILY -> object : TypeToken<RHApiResponse<RHDailyItem>>() {}.type
+            this == HOT -> object : TypeToken<RHApiResponse<RHHotItem>>() {}.type
             else -> object : TypeToken<RHApiResponse<RHNews>>() {}.type
         }
     }

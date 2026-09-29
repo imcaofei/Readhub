@@ -97,6 +97,9 @@ open class RHToolWindowContent(var project: Project, var category: RHCategory) {
         return arrayOf(titleColumn, datetimeColumn)
     }
 
+    /** 是否支持"加载更多"分页；每日早报/排行榜为一次性加载全部，返回 false */
+    open fun getSupportsPagination(): Boolean = true
+
     /** Called only once */
     open fun initTableStyle() {
         myTable.emptyText.text = RHUtil.message("View.emptyTable")
@@ -129,7 +132,16 @@ open class RHToolWindowContent(var project: Project, var category: RHCategory) {
         val model = ListTableModel(columns, service<RHData>().getItems(category, filterText))
         myTable.setPaintBusy(false)
         myTable.setModelAndUpdateColumns(model)
-        myTable.columnModel.getColumn(columns.size - 1).maxWidth = 80
+        onColumnsUpdated(columns)
+    }
+
+    /** 列更新后的钩子：默认收窄 date 列（相对时间列），子类可覆写调整列宽/表头 */
+    open fun onColumnsUpdated(columns: Array<ColumnInfo<RHBaseItem, *>>) {
+        columns.forEachIndexed { idx, col ->
+            if (col.name == "date") {
+                myTable.columnModel.getColumn(idx).maxWidth = 80
+            }
+        }
     }
 
     private fun setSummaryPanel() {
@@ -265,23 +277,25 @@ open class RHToolWindowContent(var project: Project, var category: RHCategory) {
     private fun buildTablePane(): JPanel {
         val panel = JPanel(BorderLayout())
         val pane = ScrollPaneFactory.createScrollPane(myTable, SideBorder.TOP)
-        pane.verticalScrollBar.addAdjustmentListener { e ->
-            val maxOffset = pane.verticalScrollBar.maximum - pane.verticalScrollBar.height
-            if (maxOffset > 0 && e.value == maxOffset) {
-                loadMoreBtn.isVisible = true
-            } else if (maxOffset - e.value > loadMoreBtn.height * 2) {
+        if (getSupportsPagination()) {
+            pane.verticalScrollBar.addAdjustmentListener { e ->
+                val maxOffset = pane.verticalScrollBar.maximum - pane.verticalScrollBar.height
+                if (maxOffset > 0 && e.value == maxOffset) {
+                    loadMoreBtn.isVisible = true
+                } else if (maxOffset - e.value > loadMoreBtn.height * 2) {
+                    loadMoreBtn.isVisible = false
+                }
+            }
+
+            panel.add(loadMoreBtn, BorderLayout.SOUTH)
+            loadMoreBtn.addActionListener {
+                myTable.setPaintBusy(true)
+                project.messageBus.syncPublisher(READHUB_REFRESH_TOPIC).loadPrevItems(category)
                 loadMoreBtn.isVisible = false
             }
-        }
-
-        panel.add(pane, BorderLayout.CENTER)
-        panel.add(loadMoreBtn, BorderLayout.SOUTH)
-        loadMoreBtn.addActionListener {
-            myTable.setPaintBusy(true)
-            project.messageBus.syncPublisher(READHUB_REFRESH_TOPIC).loadPrevItems(category)
             loadMoreBtn.isVisible = false
         }
-        loadMoreBtn.isVisible = false
+        panel.add(pane, BorderLayout.CENTER)
         return panel
     }
 
@@ -335,5 +349,68 @@ open class RHToolWindowContent(var project: Project, var category: RHCategory) {
         splitter.secondComponent = linkPane
 
         return splitter
+    }
+}
+
+/**
+ * 简单内容列表（每日早报 / 排行榜）。
+ * 序号 + 标题；排行榜额外显示相对时间（"xx分钟前"）。无分页，一次性加载全部。
+ */
+class RHSimpleListContent(project: Project, category: RHCategory) : RHToolWindowContent(project, category) {
+
+    override fun getSupportsPagination(): Boolean = false
+
+    override fun onColumnsUpdated(columns: Array<ColumnInfo<RHBaseItem, *>>) {
+        // 简单列表不显示表头行
+        myTable.setTableHeader(null)
+        if (columns.isNotEmpty()) {
+            // 序号列（第 0 列）收窄
+            val numberCol = myTable.columnModel.getColumn(0)
+            numberCol.minWidth = 24
+            numberCol.preferredWidth = 32
+            numberCol.maxWidth = 44
+        }
+        if (category == RHCategory.HOT && columns.size >= 3) {
+            // 排行榜时间列（第 2 列）收窄
+            val dateCol = myTable.columnModel.getColumn(2)
+            dateCol.minWidth = 60
+            dateCol.preferredWidth = 80
+            dateCol.maxWidth = 90
+        }
+    }
+
+    override fun getColumns(): Array<ColumnInfo<RHBaseItem, *>> {
+        // 序号列：显示当前显示顺序的行号（1, 2, 3 …）
+        val numberColumn = object : ColumnInfo<RHBaseItem, String>("") {
+            override fun valueOf(item: RHBaseItem?) = ""
+            override fun getRenderer(item: RHBaseItem?): TableCellRenderer = object : TableCellRenderer {
+                override fun getTableCellRendererComponent(
+                        table: JTable, value: Any?, isSelected: Boolean, hasFocus: Boolean,
+                        row: Int, column: Int): Component {
+                    val label = JLabel((row + 1).toString())
+                    label.horizontalAlignment = SwingConstants.CENTER
+                    label.border = JBUI.Borders.emptyRight(8)
+                    label.foreground = if (isSelected) table.selectionForeground else table.foreground
+                    label.background = if (isSelected) table.selectionBackground else table.background
+                    label.isOpaque = true
+                    return label
+                }
+            }
+        }
+        // 标题列（空表头，占剩余宽度）
+        val titleColumn = object : ColumnInfo<RHBaseItem, String>("") {
+            override fun valueOf(item: RHBaseItem?) = item?.getTitleText().orEmpty()
+            override fun getRenderer(item: RHBaseItem?): TableCellRenderer = RHBaseCellRenderer(item)
+        }
+        // 排行榜额外显示发布时间（"xx分钟前"相对时间）
+        return if (category == RHCategory.HOT) {
+            val datetimeColumn = object : ColumnInfo<RHBaseItem, String>("") {
+                override fun valueOf(item: RHBaseItem?) = RHUtil.getTimeDelta(item?.getDateTime())
+                override fun getRenderer(item: RHBaseItem?): TableCellRenderer = RHSmallCellRenderer()
+            }
+            arrayOf(numberColumn, titleColumn, datetimeColumn)
+        } else {
+            arrayOf(numberColumn, titleColumn)
+        }
     }
 }

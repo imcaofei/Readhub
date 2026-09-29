@@ -49,11 +49,14 @@ class RHToolWindow : ToolWindowFactory, DumbAware {
     private fun initRHContents(project: Project) {
         myRHContents.clear()
 
+        myRHContents.add(NameContentPair(RHCategory.DAILY, RHSimpleListContent(project, RHCategory.DAILY)))
+        myRHContents.add(NameContentPair(RHCategory.HOT, RHSimpleListContent(project, RHCategory.HOT)))
         myRHContents.add(NameContentPair(RHCategory.TOPIC, RHTopicWindowContent(project)))
         myRHContents.add(NameContentPair(RHCategory.NEWS, RHNewsWindowContent(project, RHCategory.NEWS)))
-        myRHContents.add(NameContentPair(RHCategory.TECH_NEWS, RHNewsWindowContent(project, RHCategory.TECH_NEWS)))
-        myRHContents.add(NameContentPair(RHCategory.BLOCKCHAIN, RHNewsWindowContent(project, RHCategory.BLOCKCHAIN)))
-        myRHContents.add(NameContentPair(RHCategory.JOB, RHJobWindowContent(project)))
+        // 以下三个 Tab 暂时隐藏（如需恢复，取消注释即可）
+        // myRHContents.add(NameContentPair(RHCategory.TECH_NEWS, RHNewsWindowContent(project, RHCategory.TECH_NEWS)))
+        // myRHContents.add(NameContentPair(RHCategory.BLOCKCHAIN, RHNewsWindowContent(project, RHCategory.BLOCKCHAIN)))
+        // myRHContents.add(NameContentPair(RHCategory.JOB, RHJobWindowContent(project)))
 
         myRHContents.forEach { (category, content) ->
             content.initView()
