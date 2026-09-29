@@ -14,6 +14,7 @@ enum class RHCategory(
 ) {
     TOPIC("RHCategory.topic", "", "topic"),
     NEWS("RHCategory.news", "news", "news"),
+    FINANCE("RHCategory.finance", "news/finance", "news/list"),
     DAILY("RHCategory.daily", "daily", "daily"),
     HOT("RHCategory.hot", "hot", "topic/hot"),
     TECH_NEWS("RHCategory.technews", "tech", "technews"),

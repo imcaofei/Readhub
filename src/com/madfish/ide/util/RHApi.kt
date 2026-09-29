@@ -7,12 +7,10 @@ import com.madfish.ide.internal.d
 import com.madfish.ide.model.RHApiResponse
 import com.madfish.ide.model.RHBaseItem
 import com.madfish.ide.model.RHCategory
-import com.madfish.ide.model.RHDailyItem
 import com.madfish.ide.model.RHDailyListResponse
-import com.madfish.ide.model.RHHotItem
 import com.madfish.ide.model.RHHotListResponse
 import com.madfish.ide.model.RHInstantView
-import com.madfish.ide.model.RHTopic
+import com.madfish.ide.model.RHNewsListResponse
 import com.madfish.ide.model.RHTopicListResponse
 import com.madfish.ide.util.RHUtil.Companion.gson
 import okhttp3.OkHttpClient
@@ -96,7 +94,7 @@ class RHApi {
             val items = service<RHData>().getItems(category)
             val lastItem = items.lastOrNull()
             val cursor = when (category) {
-                RHCategory.TOPIC -> lastItem?.id?.takeIf { it.isNotBlank() } ?: "@null"
+                RHCategory.TOPIC, RHCategory.FINANCE -> lastItem?.id?.takeIf { it.isNotBlank() } ?: "@null"
                 else -> lastItem?.getDateTime()?.atZone(ZoneId.of("UTC"))?.toEpochSecond()?.times(1000)?.toString() ?: "@null"
             }
             return refreshItems(category, cursor, pageSize)
@@ -110,6 +108,8 @@ class RHApi {
                 RHCategory.DAILY -> getDailyList()
                 // 排行榜（24 小时热榜）：GET /topic/hot（无 size，默认返回全部）
                 RHCategory.HOT -> getHotList()
+                // 财经快讯：GET /news/list?page=1&size=N&type=7&max_news_id=<cursor>
+                RHCategory.FINANCE -> getFinanceList(cursor, pageSize)
                 else -> getLegacyResponse(category, cursor, pageSize)
             }
         }
@@ -154,6 +154,39 @@ class RHApi {
                     }
                     ApiResult(true, result = RHApiResponse(
                             pageSize = items.size, totalItems = items.size, totalPages = 1, data = items))
+                }
+            } catch (e: Exception) {
+                logger.d(ErrMessage.API_NETWORK_ERROR.text, e)
+                ApiResult(false, ErrMessage.API_NETWORK_ERROR, e.message.orEmpty())
+            }
+        }
+
+        /**
+         * 财经快讯接口：/news/list?page=1&size=N&type=7&max_news_id=<cursor>。
+         * 归一化 uid 到 id、siteNameDisplay 到 siteName。
+         */
+        private fun getFinanceList(maxNewsId: String, pageSize: Int): ApiResult<RHApiResponse<out RHBaseItem>> {
+            val cleanCursor = if (maxNewsId.isBlank() || maxNewsId == "@null") "" else maxNewsId
+            val url = "${Constants.Readhub.apiHost}/news/list?page=1&size=$pageSize&max_news_id=$cleanCursor&type=7"
+            return try {
+                val request = Request.Builder().url(url).header("Content-Type", "application/json; charset=UTF-8").build()
+                val response = httpClient.newCall(request).execute()
+                if (!response.isSuccessful) {
+                    ApiResult(false, errcode = ErrMessage.API_NETWORK_ERROR)
+                } else {
+                    val res = response.body?.string().orEmpty()
+                    val listResp = gson.fromJson(res, RHNewsListResponse::class.java)
+                    val items = listResp.data.items
+                    items.forEach { it ->
+                        it.category = RHCategory.FINANCE
+                        if (it.id.isBlank()) it.id = it.uid
+                        if (it.siteName.isBlank()) it.siteName = it.siteNameDisplay
+                    }
+                    ApiResult(true, result = RHApiResponse(
+                            pageSize = pageSize,
+                            totalItems = listResp.data.totalItems,
+                            totalPages = listResp.data.totalPages,
+                            data = items))
                 }
             } catch (e: Exception) {
                 logger.d(ErrMessage.API_NETWORK_ERROR.text, e)
