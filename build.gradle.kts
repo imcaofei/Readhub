@@ -6,7 +6,7 @@ plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "1.7.10"
     id("org.jetbrains.kotlin.plugin.serialization") version "1.7.10"
-    id("org.jetbrains.intellij") version "1.8.0"
+    id("org.jetbrains.intellij") version "1.13.1"
     id("org.jetbrains.changelog") version "1.3.1"
 }
 
@@ -26,6 +26,8 @@ group = properties("pluginGroup")
 version = properties("pluginVersion")
 
 repositories {
+    // 阿里云镜像优先，加速依赖下载；缺失时回退 mavenCentral
+    maven { url = uri("https://maven.aliyun.com/repository/public") }
     mavenCentral()
 }
 

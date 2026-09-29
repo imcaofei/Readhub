@@ -2,8 +2,8 @@
 
 #### Prerequisite
 
-- JDK 8u112+
-- Intellij IDEA (2016.3+)
+- JDK 11+ (recommended: JDK 17)
+- Intellij IDEA (2021.2+, build 212+)
 - Plugins Enabled: Kotlin
 
 Tech Stack
@@ -15,11 +15,17 @@ Tech Stack
 #### Build / Run
 
 ```
-# run in sandbox
-gradle clean runIde
+# run in sandbox (Windows)
+gradlew.bat clean runIde
 
-# build artifact
-gradle clean buildPlugin
+# run in sandbox (macOS / Linux)
+./gradlew clean runIde
+
+# build artifact (Windows)
+gradlew.bat clean buildPlugin
+
+# build artifact (macOS / Linux)
+./gradlew clean buildPlugin
 ```
 
 > Advanced Debug: Add Custom VM Options to Intellij IDEA
