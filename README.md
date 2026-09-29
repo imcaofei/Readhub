@@ -57,7 +57,7 @@ gradlew.bat clean buildPlugin
 
 下载插件 Zip 包：
 
-- 方案1：在 [Releases](https://github.com/roger-yh99/Readhub/releases) 页面选择最新的 Zip 包（Readhub-1.x.x.zip）进行下载
+- 方案1：在 [Releases](https://github.com/imcaofei/Readhub/releases) 页面选择最新的 Zip 包（Readhub-1.x.x.zip）进行下载
 - 方案2：前往 JetBrains [官方仓库](http://plugins.jetbrains.com/plugin/10539-readhub) 页面，Download Plugin 处下载插件 Zip 包
 
 下载完成后，IDE 中 `Preferences` (Windows 下为 Settings) => `Plugins` => `Install plugin from disk...`，点选已下载的 Zip 包进行安装，依照提示重启 IDE 生效
