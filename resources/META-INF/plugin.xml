@@ -44,7 +44,7 @@
 
     <extensions defaultExtensionNs="com.intellij">
         <toolWindow id="Readhub" icon="/images/readhubToolWindow.png" anchor="bottom" factoryClass="com.madfish.ide.view.RHToolWindow"/>
-        <applicationConfigurable id="Readhub.Configurable" provider="com.madfish.ide.configurable.RHConfigurableProvider"/>
+        <applicationConfigurable id="Readhub.Configurable" displayName="Readhub" provider="com.madfish.ide.configurable.RHConfigurableProvider"/>
         <notificationGroup displayType="TOOL_WINDOW" id="Readhub" isLogByDefault="false" toolWindowId="Readhub"/>
         <postStartupActivity implementation="com.madfish.ide.component.RHAppComponent" />
     </extensions>
