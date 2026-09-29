@@ -60,6 +60,13 @@ class RHData : PersistentStateComponent<RHData.State> {
         myState.items = mutableMapOf()
     }
 
+    /** 清空单个板块的缓存（内存 + 持久化），用于热门话题这类"当前集合"型数据的刷新替换。 */
+    @Synchronized
+    fun clearCategory(category: RHCategory) {
+        myItems.remove(category)
+        myState.items.remove(category)
+    }
+
     // Call only once, before myItems set
     @Synchronized
     fun reduceCachedItems() {

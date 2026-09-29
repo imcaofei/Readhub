@@ -76,6 +76,11 @@ class RHApi {
         }
 
         fun fetchLatestItems(category: RHCategory, pageSize: Int = 20): ApiResult<Boolean> {
+            // 热门话题为"当前话题集合"，且新旧接口 id 体系不同（新版用 uid 作游标）。
+            // 刷新时替换旧缓存，避免旧版遗留的 id 污染 max_topic_id 翻页游标，导致"加载更多"无效。
+            if (category == RHCategory.TOPIC) {
+                service<RHData>().clearCategory(category)
+            }
             val cursor = when (category) {
                 RHCategory.JOB -> LocalDateTime.now().toEpochSecond(ZoneOffset.UTC).times(1000).toString()
                 else -> "@null"
