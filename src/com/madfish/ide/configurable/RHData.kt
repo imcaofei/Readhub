@@ -1,5 +1,6 @@
 package com.madfish.ide.configurable
 
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.State
@@ -32,12 +33,12 @@ class RHData : PersistentStateComponent<RHData.State> {
     }
 
     fun getReadStatistics(): List<RHReadStatistics> {
-        // 过滤已暂时隐藏的板块（开发者资讯/区块链资讯/招聘行情），设置页只统计当前可见的板块
-        return RHCategory.values()
-                .filterNot { it == RHCategory.TECH_NEWS || it == RHCategory.BLOCKCHAIN || it == RHCategory.JOB }
-                .map { c ->
-                    RHReadStatistics(c, myState.readItems[c]?.size ?: 0)
-                }
+        // 按当前 Tab 展示顺序排列；隐藏板块（开发者资讯/区块链资讯/招聘行情）不参与统计
+        val visibleOrder = listOf(
+                RHCategory.DAILY, RHCategory.HOT, RHCategory.TOPIC,
+                RHCategory.NEWS, RHCategory.FINANCE
+        )
+        return visibleOrder.map { c -> RHReadStatistics(c, myState.readItems[c]?.size ?: 0) }
     }
 
     @Synchronized
@@ -46,6 +47,9 @@ class RHData : PersistentStateComponent<RHData.State> {
         myState.items[item.category]?.find { it.id == item.id }?.finished = true
         // 已读 id 独立持久化，清空缓存（clearCategory）后仍保留，确保已读状态不丢失
         myState.readItems.getOrPut(item.category) { mutableSetOf() }.add(item.id)
+        // 立即写盘：多窗口/多进程场景下，PersistentStateComponent 默认只在退出/空闲时保存，
+        // 后关闭的窗口会覆盖先前的统计。这里强制保存，保证任一窗口查看后统计即时落盘。
+        ApplicationManager.getApplication().saveSettings()
     }
 
     @Synchronized
