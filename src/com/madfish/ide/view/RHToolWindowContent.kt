@@ -1,6 +1,9 @@
 package com.madfish.ide.view
 
 import com.intellij.ide.DataManager
+import com.intellij.notification.Notification
+import com.intellij.notification.NotificationType
+import com.intellij.notification.Notifications
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
@@ -29,6 +32,8 @@ import java.awt.Component
 import java.awt.Container
 import java.awt.Cursor
 import java.awt.Insets
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
 import java.awt.event.KeyEvent
 import java.awt.event.MouseEvent
 import javax.swing.*
@@ -120,8 +125,16 @@ open class RHToolWindowContent(var project: Project, var category: RHCategory) {
         }
         object : DoubleClickListener() {
             override fun onDoubleClick(event: MouseEvent): Boolean {
-                val action = RHInstantViewAction(provider)
-                action.actionPerformed(AnActionEvent.createFromAnAction(action, event, ActionPlaces.UNKNOWN, DataManager.getInstance().getDataContext(myTable)))
+                // 双击复制标题到剪贴板，方便分享
+                val title = myTable.selectedObject?.getTitleText().orEmpty()
+                if (title.isNotBlank()) {
+                    Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(title), null)
+                    Notifications.Bus.notify(Notification(
+                            "Readhub",
+                            RHUtil.message("View.copyTitle"),
+                            title,
+                            NotificationType.INFORMATION))
+                }
                 return true
             }
         }.installOn(myTable)
