@@ -10,7 +10,7 @@ import com.madfish.ide.model.RHCategory
 import com.madfish.ide.model.RHDailyListResponse
 import com.madfish.ide.model.RHHotListResponse
 import com.madfish.ide.model.RHInstantView
-import com.madfish.ide.model.RHNewsListResponse
+import com.madfish.ide.model.RHNews
 import com.madfish.ide.model.RHTopicListResponse
 import com.madfish.ide.util.RHUtil.Companion.gson
 import okhttp3.OkHttpClient
@@ -97,7 +97,7 @@ class RHApi {
             val items = service<RHData>().getItems(category)
             val lastItem = items.lastOrNull()
             val cursor = when (category) {
-                RHCategory.TOPIC, RHCategory.FINANCE -> lastItem?.id?.takeIf { it.isNotBlank() } ?: "@null"
+                RHCategory.TOPIC -> lastItem?.id?.takeIf { it.isNotBlank() } ?: "@null"
                 else -> lastItem?.getDateTime()?.atZone(ZoneId.of("UTC"))?.toEpochSecond()?.times(1000)?.toString() ?: "@null"
             }
             return refreshItems(category, cursor, pageSize)
@@ -111,7 +111,7 @@ class RHApi {
                 RHCategory.DAILY -> getDailyList()
                 // 排行榜（24 小时热榜）：GET /topic/hot（无 size，默认返回全部）
                 RHCategory.HOT -> getHotList()
-                // 财经快讯：GET /news/list?page=1&size=N&type=7&max_news_id=<cursor>
+                // 财经快讯：GET /news?type=7&lastCursor=<时间戳>&pageSize=N（时间游标分页）
                 RHCategory.FINANCE -> getFinanceList(cursor, pageSize)
                 else -> getLegacyResponse(category, cursor, pageSize)
             }
@@ -165,12 +165,14 @@ class RHApi {
         }
 
         /**
-         * 财经快讯接口：/news/list?page=1&size=N&type=7&max_news_id=<cursor>。
-         * 归一化 uid 到 id、siteNameDisplay 到 siteName。
+         * 财经快讯接口：/news?type=7&lastCursor=<毫秒时间戳>&pageSize=N。
+         * 与科技动态(NEWS)同一套旧接口 + 时间游标，按 publishDate 降序返回，
+         * 每页 20 条，游标=当前列表时间最旧条的 publishDate 时间戳即可稳定翻页。
+         * （旧接口顶层 data 为数组，直接映射 RHApiResponse<RHNews>，id 来自服务端 id 字段。）
          */
-        private fun getFinanceList(maxNewsId: String, pageSize: Int): ApiResult<RHApiResponse<out RHBaseItem>> {
-            val cleanCursor = if (maxNewsId.isBlank() || maxNewsId == "@null") "" else maxNewsId
-            val url = "${Constants.Readhub.apiHost}/news/list?page=1&size=$pageSize&max_news_id=$cleanCursor&type=7"
+        private fun getFinanceList(cursor: String, pageSize: Int): ApiResult<RHApiResponse<out RHBaseItem>> {
+            val cleanCursor = if (cursor.isBlank() || cursor == "@null") "" else cursor
+            val url = "${Constants.Readhub.apiHost}/news?type=7&lastCursor=$cleanCursor&pageSize=$pageSize"
             return try {
                 val request = Request.Builder().url(url).header("Content-Type", "application/json; charset=UTF-8").build()
                 val response = httpClient.newCall(request).execute()
@@ -178,18 +180,12 @@ class RHApi {
                     ApiResult(false, errcode = ErrMessage.API_NETWORK_ERROR)
                 } else {
                     val res = response.body?.string().orEmpty()
-                    val listResp = gson.fromJson(res, RHNewsListResponse::class.java)
-                    val items = listResp.data.items
-                    items.forEach { it ->
+                    val result = gson.fromJson<RHApiResponse<out RHBaseItem>?>(res, RHCategory.FINANCE.getApiResType())
+                    result?.data?.forEach { it ->
                         it.category = RHCategory.FINANCE
-                        if (it.id.isBlank()) it.id = it.uid
-                        if (it.siteName.isBlank()) it.siteName = it.siteNameDisplay
+                        if (it.id.isBlank()) it.id = (it as? RHNews)?.uid.orEmpty()
                     }
-                    ApiResult(true, result = RHApiResponse(
-                            pageSize = pageSize,
-                            totalItems = listResp.data.totalItems,
-                            totalPages = listResp.data.totalPages,
-                            data = items))
+                    ApiResult(true, result = result)
                 }
             } catch (e: Exception) {
                 logger.d(ErrMessage.API_NETWORK_ERROR.text, e)

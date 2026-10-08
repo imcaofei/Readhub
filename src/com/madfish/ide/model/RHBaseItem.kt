@@ -39,10 +39,10 @@ open class RHBaseItem(
     open fun getDateTime(): LocalDateTime? = publishDate
 
     override fun compareTo(other: RHBaseItem): Int {
-        return when (this.category) {
-            RHCategory.TOPIC -> compareValuesBy(this, other, RHBaseItem::order)
-            else -> compareValuesBy(this, other) { it.getDateTime() }
-        }
+        // 各板块统一按时间排序：NEWS/TECH/BLOCKCHAIN/FINANCE 用 publishDate，TOPIC 用 createdAt。
+        // 热门话题接口按 createdAt 降序返回且不含 order 字段，因此 TOPIC 也走时间排序，
+        // 否则 order 全为 0 时降序退化为保持插入顺序，刷新/加载更多的新内容会被追加到末尾。
+        return compareValuesBy(this, other) { it.getDateTime() }
     }
 
     override fun equals(other: Any?): Boolean {
