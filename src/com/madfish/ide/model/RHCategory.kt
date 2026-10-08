@@ -21,6 +21,18 @@ enum class RHCategory(
     BLOCKCHAIN("RHCategory.blockchain", "blockchain", "blockchain"),
     JOB("RHCategory.jobs", "jobs", "jobs");
 
+    companion object {
+        /** 当前可见板块（未暂时隐藏的板块），按 Tab 展示顺序维护。设置页统计、自动刷新等统一走这里 */
+        @JvmField
+        val VISIBLE_CATEGORIES: List<RHCategory> = listOf(
+                DAILY, HOT, TOPIC, NEWS, FINANCE
+        )
+
+        /** 该板块当前是否可见 */
+        val RHCategory.isVisible: Boolean
+            get() = this in VISIBLE_CATEGORIES
+    }
+
     fun getApiResType(): Type {
         return when {
             this == TOPIC -> object : TypeToken<RHApiResponse<RHTopic>>() {}.type

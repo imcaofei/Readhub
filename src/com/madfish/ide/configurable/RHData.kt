@@ -33,12 +33,8 @@ class RHData : PersistentStateComponent<RHData.State> {
     }
 
     fun getReadStatistics(): List<RHReadStatistics> {
-        // 按当前 Tab 展示顺序排列；隐藏板块（开发者资讯/区块链资讯/招聘行情）不参与统计
-        val visibleOrder = listOf(
-                RHCategory.DAILY, RHCategory.HOT, RHCategory.TOPIC,
-                RHCategory.NEWS, RHCategory.FINANCE
-        )
-        return visibleOrder.map { c -> RHReadStatistics(c, myState.readItems[c]?.size ?: 0) }
+        // 按可见板块（含 Tab 展示顺序）统计，隐藏板块不参与；顺序与列表来自 RHCategory.VISIBLE_CATEGORIES 统一维护
+        return RHCategory.VISIBLE_CATEGORIES.map { c -> RHReadStatistics(c, myState.readItems[c]?.size ?: 0) }
     }
 
     @Synchronized

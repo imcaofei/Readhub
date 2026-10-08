@@ -61,9 +61,11 @@ class RHApi {
         }
 
         fun refreshAll(): ApiResult<Boolean> {
+            // 只刷新当前可见板块（统一来自 RHCategory.VISIBLE_CATEGORIES），避免为不可见板块发起无谓请求并累积缓存。
+            val visible = RHCategory.VISIBLE_CATEGORIES
             // 先全部执行完（eager），再判定：任一板块成功即视为整体成功，
             // 避免单个板块（如后端已停用/失效的接口）失败导致整个刷新被判定失败、UI 不更新
-            val results = RHCategory.values().map { fetchLatestItems(it) }
+            val results = visible.map { fetchLatestItems(it) }
             return ApiResult(success = results.any { it.result == true })
         }
 
@@ -78,11 +80,12 @@ class RHApi {
         }
 
         fun fetchLatestItems(category: RHCategory, pageSize: Int = 20): ApiResult<Boolean> {
-            // 热门话题/每日早报/排行榜为"当前内容集合"，且部分接口 id 体系不同。
-            // 刷新时替换旧缓存，避免旧版遗留的 id 污染游标/累积过时内容。
-            if (category == RHCategory.TOPIC || category == RHCategory.DAILY || category == RHCategory.HOT) {
+            // 每日早报/排行榜为一次性全量加载（无分页），刷新时替换旧缓存即可，不会丢失内容。
+            if (category == RHCategory.DAILY || category == RHCategory.HOT) {
                 service<RHData>().clearCategory(category)
             }
+            // 热门话题为游标分页集合：刷新时不清空缓存，用 union 合并最新一页到列表前部，
+            // 保留用户已通过"加载更多"展开的内容，避免自动刷新后列表只剩最新一页（20 条）。
             val cursor = when (category) {
                 RHCategory.JOB -> LocalDateTime.now().toEpochSecond(ZoneOffset.UTC).times(1000).toString()
                 else -> "@null"
