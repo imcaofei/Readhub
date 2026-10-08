@@ -12,6 +12,7 @@ import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.content.ContentFactory
 import com.intellij.ui.content.ContentManagerEvent
 import com.intellij.ui.content.ContentManagerListener
+import com.madfish.ide.action.RHRefreshAction
 import com.madfish.ide.internal.d
 import com.madfish.ide.messages.READHUB_REFRESH_TOPIC
 import com.madfish.ide.messages.READHUB_VIEW_TOPIC
@@ -32,11 +33,13 @@ data class NameContentPair(val category: RHCategory, val content: RHToolWindowCo
 class RHToolWindow : ToolWindowFactory, DumbAware {
 
     private lateinit var myToolWindow: ToolWindow
+    private var myProject: Project? = null
     private lateinit var contentFactory: ContentFactory
     private val logger = Logger.getInstance(this::class.java)
     private val myRHContents = mutableListOf<NameContentPair>()
 
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
+        myProject = project
         myToolWindow = toolWindow
         contentFactory = toolWindow.contentManager.factory
         if (project.isOpen) {
@@ -67,16 +70,21 @@ class RHToolWindow : ToolWindowFactory, DumbAware {
     }
 
     private fun doRefresh(category: RHCategory?) {
-        if (category == null) {
-            val apiResult = RHApi.refreshAll()
-            if (apiResult.success) {
-                updateTableIfMatch(ignoreMatch = true)
+        try {
+            if (category == null) {
+                val apiResult = RHApi.refreshAll()
+                if (apiResult.success) {
+                    updateTableIfMatch(ignoreMatch = true)
+                }
+            } else {
+                val apiResult = RHApi.fetchLatestItems(category)
+                if (apiResult.success) {
+                    updateTableIfMatch(category.getName())
+                }
             }
-        } else {
-            val apiResult = RHApi.fetchLatestItems(category)
-            if (apiResult.success) {
-                updateTableIfMatch(category.getName())
-            }
+        } finally {
+            // 无论刷新成功或失败，都恢复刷新按钮的静态图标（先切为转圈动画的是 RHRefreshAction）
+            ApplicationManager.getApplication().invokeLater { RHRefreshAction.onRefreshFinished(myProject) }
         }
     }
 
